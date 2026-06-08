@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>全讯云 · 多平台数据看板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #0a0e14;
+  color: #e4e8ef;
+  padding: 20px;
+  min-height: 100vh;
+}
+.header {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+}
+.header h1 { font-size: 24px; font-weight: 700; color: #fff; }
+.header .badge {
+  background: linear-gradient(135deg, #FE2C55, #FF6B35);
+  padding: 4px 12px; border-radius: 20px; font-size: 12px;
+  color: #fff; margin-left: 10px;
+}
+.meta { color: #6b7a90; font-size: 13px; }
+.time-filter { display: flex; gap: 8px; }
+.time-filter button {
+  background: #1a1f2e; border: 1px solid #2a3340; color: #8b9ab0;
+  padding: 6px 16px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  transition: all .2s;
+}
+.time-filter button.active {
+  background: #FE2C55; border-color: #FE2C55; color: #fff;
+}
+.time-filter button:hover:not(.active) { border-color: #6b7a90; color: #c0c8d4; }
+
+/* 汇总卡片 */
+.cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px; margin-bottom: 20px;
+}
+.card {
+  background: #111827; border-radius: 14px; padding: 20px;
+  border: 1px solid #1e293b;
+  transition: border-color .2s;
+}
+.card:hover { border-color: var(--c); }
+.card .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.card .head .dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--c);
+}
+.card .head .name { font-size: 16px; font-weight: 600; color: #fff; }
+.card .kpi-row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+.card .kpi { min-width: 70px; }
+.card .kpi .val { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.card .kpi .lbl { font-size: 11px; color: #6b7a90; margin-top: 2px; }
+.card .kpi .delta {
+  font-size: 12px; margin-top: 2px; font-weight: 500;
+}
+.delta-up { color: #22c55e; }
+.delta-down { color: #ef4444; }
+.delta-flat { color: #6b7a90; }
+
+/* 面板 */
+.section-title {
+  font-size: 15px; font-weight: 600; color: #8b9ab0;
+  margin: 28px 0 12px; padding-left: 12px; border-left: 3px solid #FE2C55;
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.panel {
+  background: #111827; border-radius: 14px; padding: 20px;
+  border: 1px solid #1e293b;
+}
+.panel h3 {
+  font-size: 14px; font-weight: 500; color: #8b9ab0; margin-bottom: 16px;
+}
+.chart { width: 100%; height: 340px; }
+.chart-lg { width: 100%; height: 400px; }
+
+/* 表格 */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #1e293b; }
+th { color: #6b7a90; font-weight: 500; font-size: 11px; text-transform: uppercase; }
+tr:hover { background: #1a1f2e; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tag {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; color: #fff; font-weight: 500;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .cards { grid-template-columns: 1fr; }
+}
+
+.empty-state {
+  text-align: center; padding: 40px; color: #6b7a90;
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>全讯云 · 多平台数据看板 <span class="badge">BETA</span></h1>
+    <div class="meta">快照日期: 2026-06-05 · 抖音 / 视频号 / 公众号</div>
+  </div>
+  <div class="time-filter">
+    <button class="active" onclick="filterView('month')">月度</button>
+    <button onclick="filterView('week')">周度</button>
+  </div>
+</div>
+
+<!-- 汇总卡片 -->
+<div class="cards" id="cardsContainer"></div>
+
+<!-- 总量对比 + 雷达 -->
+<div class="section-title">📊 跨平台对比</div>
+<div class="grid-2">
+  <div class="panel">
+    <h3>指标总量对比</h3>
+    <div id="chartBar" class="chart"></div>
+  </div>
+  <div class="panel">
+    <h3>视频平台核心指标</h3>
+    <div id="chartRadar" class="chart"></div>
+  </div>
+</div>
+
+<!-- 趋势图 -->
+<div class="section-title">📈 增长趋势</div>
+<div class="grid-2">
+  <div class="panel">
+    <h3>公众号粉丝变化</h3>
+    <div id="chartFollower" class="chart"></div>
+  </div>
+  <div class="panel">
+    <h3>跨平台播放量趋势 (多快照)</h3>
+    <div id="chartTrend" class="chart"></div>
+  </div>
+</div>
+
+<!-- 散点图 -->
+<div class="section-title">🎯 内容表现分析</div>
+<div class="panel">
+  <h3>互动率 vs 播放量 (散点分布)</h3>
+  <div id="chartScatter" class="chart-lg"></div>
+</div>
+
+<!-- Top 内容 -->
+<div class="section-title">🏆 热门内容 Top 15</div>
+<div class="panel">
+  <div class="table-wrap" id="topTable"></div>
+</div>
+
+<script>
+const D = {"snapshot_date": "2026-06-05", "cards": [{"platform": "douyin", "label": "抖音", "color": "#FE2C55", "count": 18, "views": 42306, "likes": 503, "comments": 19, "shares": 69, "saves": 238, "followers_gained": 81}, {"platform": "shipinhao", "label": "视频号", "color": "#07C160", "count": 19, "views": 72636, "likes": 872, "comments": 53, "shares": 2593, "saves": 0, "followers_gained": 967}, {"platform": "gongzhonghao", "label": "公众号", "color": "#576B95", "count": 12, "views": 354, "likes": 0, "comments": 0, "shares": 0, "saves": 0, "followers_gained": 0}], "bar": {"categories": ["播放/阅读", "点赞", "评论", "分享", "收藏", "涨粉"], "series": [{"name": "抖音", "type": "bar", "data": [42306, 503, 19, 69, 238, 81], "itemStyle": {"color": "#FE2C55", "borderRadius": [4, 4, 0, 0]}}, {"name": "视频号", "type": "bar", "data": [72636, 872, 53, 2593, 0, 967], "itemStyle": {"color": "#07C160", "borderRadius": [4, 4, 0, 0]}}, {"name": "公众号", "type": "bar", "data": [354, 0, 0, 0, 0, 0], "itemStyle": {"color": "#576B95", "borderRadius": [4, 4, 0, 0]}}]}, "radar": {"indicators": [{"name": "总播放(归⼀)", "max": 100}, {"name": "完播率(%)", "max": 30}, {"name": "互动率(%)", "max": 10}, {"name": "平均时长(秒)", "max": 60}, {"name": "涨粉率(%)", "max": 1}], "series": [{"name": "抖音", "value": [36.8, 3.22, 1.4, 14.01, 0.191], "itemStyle": {"color": "#FE2C55"}}, {"name": "视频号", "value": [63.2, 11.9, 4.84, 34.13, 1.331], "itemStyle": {"color": "#07C160"}}]}, "follower": {"dates": ["2026-05-05", "2026-05-06", "2026-05-07", "2026-05-08", "2026-05-09", "2026-05-10", "2026-05-11", "2026-05-12", "2026-05-13", "2026-05-14", "2026-05-15", "2026-05-16", "2026-05-17", "2026-05-18", "2026-05-19", "2026-05-20", "2026-05-21", "2026-05-22", "2026-05-23", "2026-05-24", "2026-05-25", "2026-05-26", "2026-05-27", "2026-05-28", "2026-05-29", "2026-05-30", "2026-05-31", "2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04"], "total": [332, 333, 333, 333, 332, 332, 332, 332, 332, 334, 334, 335, 335, 335, 335, 336, 336, 336, 336, 336, 337, 337, 345, 346, 346, 346, 346, 346, 346, 360, 361], "new": [0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 8, 2, 0, 0, 0, 0, 0, 14, 1], "lost": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], "net": [0, 1, 0, 0, -1, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 8, 1, 0, 0, 0, 0, 0, 14, 1]}, "snapshotsTrend": null, "scatter": {"series": [{"name": "抖音", "type": "scatter", "data": [[793, 1.13, "把大模型塞进 SIM 卡？中国移动这次真"], [1786, 1.12, "算力是什么？Token 为啥值钱？#算力"], [11842, 0.85, "电力超级周期：Token如何成为西部绿电"], [12506, 1.2, "一块钱25万Token！算力时代的三种\""], [42, 11.9, "中国移动扔出万亿级 Token 体验包！"], [450, 2.22, "Token 代理这话题彻底火炸了，连孙宇"], [915, 1.86, "国家定调，全球疯抢的超级风口来了#算力#"], [924, 1.84, "Token 已成核心生产资料#算力#to"], [2076, 1.49, "国产算力芯片翻身，算力从单极走向多级#A"], [977, 1.13, "中国移动的\"AI 新梦网\"，到底想赚什么"], [4182, 2.89, "token二道贩子躺赚，0 成本月入百万"], [2430, 1.28, "2026年Token赛道：下一个财富风口"], [966, 1.86, "从中国电信布局看token市场#AI#t"], [742, 2.7, "卖Token毛利率92%，普通人如何零成"], [1093, 1.65, "算力像自来水一样？中国移动正在干一件你没"], [582, 1.72, "你的下一份工资，可能用“Token”来发"]], "symbolSize": 8, "itemStyle": {"color": "#FE2C5599"}}, {"name": "视频号", "type": "scatter", "data": [[4694, 2.58, "电力超级周期：Token如何成为西部绿电"], [640, 6.56, "Token 代理这话题彻底火炸了，连孙宇"], [380, 3.95, "卖Token毛利率92%，普通人如何零成"], [2002, 4.9, "算力像自来水一样？中国移动正在干一件你没"], [775, 2.71, "2026年Token赛道：下一个财富风口"], [987, 7.5, "国家定调，全球疯抢的超级风口来了#算力#"], [3539, 3.84, "一块钱25万Token！算力时代的三种\""], [29, 13.79, "token二道贩子躺赚，0 成本月入百万"], [1197, 2.09, "把大模型塞进 SIM 卡？中国移动这次真"], [747, 2.01, "Token 已成核心生产资料#算力#AI"], [513, 6.04, "从中国电信布局看token市场#AI#t"], [43687, 5.74, "中国移动扔出万亿级 Token 体验包！"], [5407, 3.81, "普通人做Token代理生意，有两条路#A"], [2516, 3.06, "中国移动的\"AI 新梦网\"，到底想赚什么"], [664, 5.12, "你的下一份工资，可能用“Token”来发"], [2793, 2.33, "DeepSeek宣布永久降价，每百万to"], [1143, 2.45, "算力是什么？Token 为啥值钱？#算力"], [479, 1.67, "国产算力芯片翻身，算力从单极走向多级#A"], [444, 2.7, "Token赛道普通人零门槛怎么切入？#算"]], "symbolSize": 8, "itemStyle": {"color": "#07C16099"}}, {"name": "公众号", "type": "scatter", "data": [[6, 0.0, "【边缘计算前沿站】流量盒子的秘密：PCD"], [6, 0.0, "央视新闻发布：算力上天，太空从此有了AI"], [52, 0.0, "方舟学苑：全迅云AI基础孵化班报名通道上"], [52, 0.0, "方舟云图集：token是什么？"], [55, 0.0, "【全迅云｜方舟学苑】AI基础孵化班第2期"], [21, 0.0, "OpenAI重组三大产品线，全面押注编程"], [5, 0.0, "【边缘计算前沿站】lDC产业：数字经济的"], [119, 0.0, "【全迅云｜方舟学苑】AI基础孵化班第1期"], [11, 0.0, "GPT image 2 超全玩法"], [6, 0.0, "CDN的三种应用场景以及基本原理"], [10, 0.0, "\"同心协力 万物互联\"2025迅力云产品"], [11, 0.0, "【销冠60s】地推话术之扫街破冰技巧"]], "symbolSize": 8, "itemStyle": {"color": "#576B9599"}}], "platforms": ["抖音", "视频号", "公众号"]}, "top": [{"platform": "视频号", "platform_color": "#07C160", "title": "中国移动扔出万亿级 Token 体验包！#AI#token#算力#创业", "views": 43687, "likes": 585, "shares": 1896, "engagement": "5.74%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "一块钱25万Token！算力时代的三种\"油田\"模式#算力#AI#token#创业", "views": 12506, "likes": 113, "shares": 32, "engagement": "1.20%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "电力超级周期：Token如何成为西部绿电的出口载体？#AI#token#算力#创业", "views": 11842, "likes": 92, "shares": 5, "engagement": "0.85%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "普通人做Token代理生意，有两条路#AI#token#算力#创业", "views": 5407, "likes": 35, "shares": 152, "engagement": "3.81%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "电力超级周期：Token如何成为西部绿电的出口载体？#AI#token#算力#创业", "views": 4694, "likes": 56, "shares": 65, "engagement": "2.58%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "token二道贩子躺赚，0 成本月入百万？#AI#token#算力#创业", "views": 4182, "likes": 100, "shares": 21, "engagement": "2.89%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "一块钱25万Token！算力时代的三种\"油田\"模式#算力#AI#token#创业", "views": 3539, "likes": 39, "shares": 95, "engagement": "3.84%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "DeepSeek宣布永久降价，每百万token输入只要2.5分钱#AI#token#算力#创业", "views": 2793, "likes": 19, "shares": 44, "engagement": "2.33%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "中国移动的\"AI 新梦网\"，到底想赚什么钱？#移动云大会#算力#AI#token#创业", "views": 2516, "likes": 17, "shares": 60, "engagement": "3.06%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "2026年Token赛道：下一个财富风口#算力#AI#token#创业", "views": 2430, "likes": 28, "shares": 2, "engagement": "1.28%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "国产算力芯片翻身，算力从单极走向多级#AI#token#算力#创业", "views": 2076, "likes": 29, "shares": 0, "engagement": "1.49%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "算力像自来水一样？中国移动正在干一件你没注意到的大事#移动云大会#算力#AI#token#创业", "views": 2002, "likes": 24, "shares": 69, "engagement": "4.90%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "算力是什么？Token 为啥值钱？#算力#AI#token#创业", "views": 1786, "likes": 19, "shares": 0, "engagement": "1.12%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "把大模型塞进 SIM 卡？中国移动这次真敢想#移动云大会#算力#AI#token#创业", "views": 1197, "likes": 11, "shares": 14, "engagement": "2.09%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "算力是什么？Token 为啥值钱？#算力#AI#token#创业", "views": 1143, "likes": 8, "shares": 20, "engagement": "2.45%"}]};
+
+// ====== 工具函数 ======
+function fmtDelta(v) {
+  if (v == null) return '<span class="delta-flat">-</span>';
+  const cls = v > 0 ? 'delta-up' : (v < 0 ? 'delta-down' : 'delta-flat');
+  const sign = v > 0 ? '+' : '';
+  return `<span class="${cls}">${sign}${v}%</span>`;
+}
+
+// ====== 汇总卡片 ======
+const cardsHtml = D.cards.map(c => `
+  <div class="card" style="--c:${c.color}">
+    <div class="head">
+      <div class="dot"></div>
+      <div class="name">${c.label}</div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi">
+        <div class="val">${c.count}</div>
+        <div class="lbl">内容数</div>
+      </div>
+      <div class="kpi">
+        <div class="val">${(c.views/10000).toFixed(1)}<span style="font-size:13px;color:#6b7a90">万</span></div>
+        <div class="lbl">播放 ${(c.views_wow != null) ? fmtDelta(c.views_wow) : ''}</div>
+      </div>
+      <div class="kpi">
+        <div class="val">${(c.likes/100).toFixed(0)}<span style="font-size:13px;color:#6b7a90">百</span></div>
+        <div class="lbl">点赞 ${(c.likes_wow != null) ? fmtDelta(c.likes_wow) : ''}</div>
+      </div>
+      <div class="kpi">
+        <div class="val">${(c.shares).toLocaleString()}</div>
+        <div class="lbl">分享</div>
+      </div>
+      <div class="kpi">
+        <div class="val">${(c.followers_gained).toLocaleString()}</div>
+        <div class="lbl">涨粉</div>
+      </div>
+    </div>
+  </div>`).join('');
+document.getElementById('cardsContainer').innerHTML = cardsHtml;
+
+// ====== 柱状图 ======
+if (D.bar && D.bar.series.length) {
+  echarts.init(document.getElementById('chartBar')).setOption({
+    tooltip: { trigger: 'axis', backgroundColor: '#1a1f2e', borderColor: '#2a3340', textStyle: { color: '#e4e8ef' } },
+    legend: { textStyle: { color: '#8b9ab0' }, top: 0 },
+    grid: { left: 60, right: 30, top: 50, bottom: 40 },
+    xAxis: { type: 'category', data: D.bar.categories, axisLabel: { color: '#8b9ab0' }, axisLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'value', axisLabel: { color: '#8b9ab0' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    series: D.bar.series
+  });
+}
+
+// ====== 雷达图 ======
+if (D.radar && D.radar.series.length) {
+  echarts.init(document.getElementById('chartRadar')).setOption({
+    tooltip: { backgroundColor: '#1a1f2e', borderColor: '#2a3340' },
+    legend: { textStyle: { color: '#8b9ab0' }, top: 0 },
+    radar: {
+      indicator: D.radar.indicators,
+      axisName: { color: '#8b9ab0' },
+      center: ['50%', '55%'],
+      radius: '65%',
+      splitLine: { lineStyle: { color: '#1e293b' } },
+    },
+    series: [{ type: 'radar', data: D.radar.series, areaStyle: { opacity: 0.15 } }]
+  });
+}
+
+// ====== 粉丝趋势 ======
+if (D.follower && D.follower.dates.length) {
+  echarts.init(document.getElementById('chartFollower')).setOption({
+    tooltip: { trigger: 'axis', backgroundColor: '#1a1f2e', borderColor: '#2a3340' },
+    legend: { textStyle: { color: '#8b9ab0' }, top: 0 },
+    grid: { left: 60, right: 50, top: 50, bottom: 40 },
+    xAxis: {
+      type: 'category', data: D.follower.dates,
+      axisLabel: { color: '#8b9ab0', rotate: 30, fontSize: 10 },
+      axisLine: { lineStyle: { color: '#1e293b' } }
+    },
+    yAxis: [
+      { type: 'value', name: '累计', nameTextStyle: { color: '#6b7a90' }, axisLabel: { color: '#8b9ab0' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+      { type: 'value', name: '日增减', nameTextStyle: { color: '#6b7a90' }, axisLabel: { color: '#8b9ab0' }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: '累计粉丝', type: 'line', data: D.follower.total, smooth: true,
+        lineStyle: { color: '#576B95', width: 2.5 }, itemStyle: { color: '#576B95' },
+        areaStyle: { color: 'rgba(87,107,149,0.1)' } },
+      { name: '新关注', type: 'bar', yAxisIndex: 1, data: D.follower.new,
+        itemStyle: { color: '#22c55e', borderRadius: [3,3,0,0] }, barGap: '0%' },
+      { name: '取关', type: 'bar', yAxisIndex: 1, data: D.follower.lost,
+        itemStyle: { color: '#ef4444', borderRadius: [3,3,0,0] } }
+    ]
+  });
+} else {
+  document.getElementById('chartFollower').parentElement.innerHTML +=
+    '<div class="empty-state">暂无粉丝数据</div>';
+}
+
+// ====== 播放量趋势 ======
+if (D.snapshotsTrend) {
+  echarts.init(document.getElementById('chartTrend')).setOption({
+    tooltip: { trigger: 'axis', backgroundColor: '#1a1f2e', borderColor: '#2a3340' },
+    legend: { textStyle: { color: '#8b9ab0' }, top: 0 },
+    grid: { left: 60, right: 30, top: 50, bottom: 40 },
+    xAxis: {
+      type: 'category', data: D.snapshotsTrend.dates,
+      axisLabel: { color: '#8b9ab0' },
+      axisLine: { lineStyle: { color: '#1e293b' } }
+    },
+    yAxis: { type: 'value', axisLabel: { color: '#8b9ab0' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    series: D.snapshotsTrend.series
+  });
+} else {
+  document.getElementById('chartTrend').parentElement.innerHTML +=
+    '<div class="empty-state">📭 只有一次快照，积累更多数据后显示趋势</div>';
+}
+
+// ====== 散点图 ======
+if (D.scatter && D.scatter.series.length) {
+  const opt = {
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: '#1a1f2e',
+      borderColor: '#2a3340',
+      formatter: function(p) { return p.value[2] + '<br/>播放: ' + p.value[0].toLocaleString() + '<br/>互动率: ' + p.value[1] + '%'; }
+    },
+    legend: { textStyle: { color: '#8b9ab0' }, top: 0 },
+    grid: { left: 70, right: 30, top: 50, bottom: 50 },
+    xAxis: { type: 'value', name: '播放量', nameTextStyle: { color: '#6b7a90' }, axisLabel: { color: '#8b9ab0', formatter: function(v) { return (v/1000).toFixed(0)+'k'; } }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    yAxis: { type: 'value', name: '互动率 (%)', nameTextStyle: { color: '#6b7a90' }, axisLabel: { color: '#8b9ab0' }, splitLine: { lineStyle: { color: '#1e293b' } } },
+    series: D.scatter.series
+  };
+  echarts.init(document.getElementById('chartScatter')).setOption(opt);
+} else {
+  document.getElementById('chartScatter').parentElement.innerHTML +=
+    '<div class="empty-state">暂无数据</div>';
+}
+
+// ====== Top 表格 ======
+document.getElementById('topTable').innerHTML = `
+<table><thead><tr>
+  <th>#</th><th>平台</th><th>标题</th>
+  <th class="num">播放</th><th class="num">点赞</th><th class="num">分享</th><th class="num">互动率</th>
+</tr></thead><tbody>
+${D.top.map((r, i) => `<tr>
+  <td>${i+1}</td>
+  <td><span class="tag" style="background:${r.platform_color}">${r.platform}</span></td>
+  <td>${r.title}</td>
+  <td class="num">${r.views.toLocaleString()}</td>
+  <td class="num">${r.likes ? r.likes.toLocaleString() : '-'}</td>
+  <td class="num">${r.shares ? r.shares.toLocaleString() : '-'}</td>
+  <td class="num" style="font-weight:600;color:${parseFloat(r.engagement) > 5 ? '#22c55e' : parseFloat(r.engagement) > 2 ? '#f59e0b' : '#8b9ab0'}">${r.engagement}</td>
+</tr>`).join('')}
+</tbody></table>`;
+
+// ====== 时间筛选 ======
+window.filterView = function(mode) {
+  document.querySelectorAll('.time-filter button').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  // 预留: 未来根据 mode 切换数据展示 (月度 vs 周度)
+};
+
+</script>
+</body>
+</html>
