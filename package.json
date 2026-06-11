@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "python ../src/report.py && copy ..\\reports\\index.html .\\index.html"
+    "build": "python ../src/report.py && copy ..\\reports\\index.html .\\index.html",
+    "vercel-build": "echo no build needed"
   }
 }

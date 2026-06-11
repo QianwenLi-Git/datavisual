@@ -106,6 +106,78 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 </head>
 <body>
 
+<style>
+.login-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: radial-gradient(circle at top, #182235 0%, #0a0e14 55%);
+}
+.login-card {
+  width: min(420px, 100%); background: #111827; border: 1px solid #243044;
+  border-radius: 18px; padding: 30px; box-shadow: 0 24px 80px rgba(0,0,0,.45);
+}
+.login-card h2 { color: #fff; font-size: 24px; margin-bottom: 8px; }
+.login-card p { color: #8b9ab0; font-size: 14px; line-height: 1.6; margin-bottom: 22px; }
+.login-card label { display: block; color: #cbd5e1; font-size: 13px; margin-bottom: 8px; }
+.login-card input {
+  width: 100%; background: #0a0e14; color: #fff; border: 1px solid #2a3340;
+  border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;
+}
+.login-card input:focus { border-color: #FE2C55; box-shadow: 0 0 0 3px rgba(254,44,85,.16); }
+.login-card button {
+  width: 100%; margin-top: 14px; border: 0; border-radius: 10px; padding: 12px 14px;
+  color: #fff; font-weight: 700; cursor: pointer;
+  background: linear-gradient(135deg, #FE2C55, #FF6B35);
+}
+.login-error { min-height: 18px; color: #f87171; font-size: 13px; margin-top: 10px; }
+.app-locked { visibility: hidden; }
+</style>
+<div id="loginScreen" class="login-screen">
+  <form id="loginForm" class="login-card" autocomplete="off">
+    <h2>&#26041;&#33311;&#23398;&#33489;&#25968;&#25454;&#30475;&#26495;</h2>
+    <p>&#35831;&#36755;&#20837;&#35775;&#38382;&#23494;&#30721;&#12290;&#39564;&#35777;&#36890;&#36807;&#21518;&#65292;&#26412;&#35774;&#22791;&#20250;&#35760;&#20303;&#30331;&#24405;&#29366;&#24577;&#12290;</p>
+    <label for="dashboardPassword">&#35775;&#38382;&#23494;&#30721;</label>
+    <input id="dashboardPassword" type="password" placeholder="&#35831;&#36755;&#20837;&#23494;&#30721;" autofocus>
+    <button type="submit">&#36827;&#20837;&#30475;&#26495;</button>
+    <div id="loginError" class="login-error" aria-live="polite"></div>
+  </form>
+</div>
+<script>
+window.addEventListener('DOMContentLoaded', function () {
+  const PASSWORD_SHA256 = 'e9e4b696a951967378f68eb53259678df1bae493de121923beec52900a05ef4d';
+  const SESSION_KEY = 'fangzhou_dashboard_auth_v1';
+  const loginScreen = document.getElementById('loginScreen');
+  const app = document.getElementById('dashboardApp');
+  const error = document.getElementById('loginError');
+
+  function unlock() {
+    loginScreen.style.display = 'none';
+    app.classList.remove('app-locked');
+  }
+
+  async function sha256(text) {
+    const data = new TextEncoder().encode(text);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  if (sessionStorage.getItem(SESSION_KEY) === 'ok') unlock();
+
+  document.getElementById('loginForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const password = document.getElementById('dashboardPassword').value;
+    if (await sha256(password) === PASSWORD_SHA256) {
+      sessionStorage.setItem(SESSION_KEY, 'ok');
+      unlock();
+    } else {
+      error.textContent = '\u5bc6\u7801\u4e0d\u6b63\u786e\uff0c\u8bf7\u518d\u8bd5\u4e00\u6b21\u3002';
+    }
+  });
+});
+</script>
+
+<div id="dashboardApp" class="app-locked">
+
 <div class="header">
   <div>
     <h1>方舟学苑 · 多平台数据看板 <span class="badge">BETA</span></h1>
@@ -159,6 +231,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   <div class="table-wrap" id="topTable"></div>
 </div>
 
+</div>
 <script>
 const D = {"snapshot_date": "2026-06-05", "cards": [{"platform": "douyin", "label": "抖音", "color": "#FE2C55", "count": 18, "views": 42306, "likes": 503, "comments": 19, "shares": 69, "saves": 238, "followers_gained": 81}, {"platform": "shipinhao", "label": "视频号", "color": "#07C160", "count": 19, "views": 72636, "likes": 872, "comments": 53, "shares": 2593, "saves": 0, "followers_gained": 967}, {"platform": "gongzhonghao", "label": "公众号", "color": "#576B95", "count": 12, "views": 354, "likes": 0, "comments": 0, "shares": 0, "saves": 0, "followers_gained": 0}], "bar": {"categories": ["播放/阅读", "点赞", "评论", "分享", "收藏", "涨粉"], "series": [{"name": "抖音", "type": "bar", "data": [42306, 503, 19, 69, 238, 81], "itemStyle": {"color": "#FE2C55", "borderRadius": [4, 4, 0, 0]}}, {"name": "视频号", "type": "bar", "data": [72636, 872, 53, 2593, 0, 967], "itemStyle": {"color": "#07C160", "borderRadius": [4, 4, 0, 0]}}, {"name": "公众号", "type": "bar", "data": [354, 0, 0, 0, 0, 0], "itemStyle": {"color": "#576B95", "borderRadius": [4, 4, 0, 0]}}]}, "radar": {"indicators": [{"name": "总播放(归⼀)", "max": 100}, {"name": "完播率(%)", "max": 30}, {"name": "互动率(%)", "max": 10}, {"name": "平均时长(秒)", "max": 60}, {"name": "涨粉率(%)", "max": 1}], "series": [{"name": "抖音", "value": [36.8, 3.22, 1.4, 14.01, 0.191], "itemStyle": {"color": "#FE2C55"}}, {"name": "视频号", "value": [63.2, 11.9, 4.84, 34.13, 1.331], "itemStyle": {"color": "#07C160"}}]}, "follower": {"dates": ["2026-05-05", "2026-05-06", "2026-05-07", "2026-05-08", "2026-05-09", "2026-05-10", "2026-05-11", "2026-05-12", "2026-05-13", "2026-05-14", "2026-05-15", "2026-05-16", "2026-05-17", "2026-05-18", "2026-05-19", "2026-05-20", "2026-05-21", "2026-05-22", "2026-05-23", "2026-05-24", "2026-05-25", "2026-05-26", "2026-05-27", "2026-05-28", "2026-05-29", "2026-05-30", "2026-05-31", "2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04"], "total": [332, 333, 333, 333, 332, 332, 332, 332, 332, 334, 334, 335, 335, 335, 335, 336, 336, 336, 336, 336, 337, 337, 345, 346, 346, 346, 346, 346, 346, 360, 361], "new": [0, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 8, 2, 0, 0, 0, 0, 0, 14, 1], "lost": [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], "net": [0, 1, 0, 0, -1, 0, 0, 0, 0, 2, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 8, 1, 0, 0, 0, 0, 0, 14, 1]}, "snapshotsTrend": null, "scatter": {"series": [{"name": "抖音", "type": "scatter", "data": [[793, 1.13, "把大模型塞进 SIM 卡？中国移动这次真"], [1786, 1.12, "算力是什么？Token 为啥值钱？#算力"], [11842, 0.85, "电力超级周期：Token如何成为西部绿电"], [12506, 1.2, "一块钱25万Token！算力时代的三种\""], [42, 11.9, "中国移动扔出万亿级 Token 体验包！"], [450, 2.22, "Token 代理这话题彻底火炸了，连孙宇"], [915, 1.86, "国家定调，全球疯抢的超级风口来了#算力#"], [924, 1.84, "Token 已成核心生产资料#算力#to"], [2076, 1.49, "国产算力芯片翻身，算力从单极走向多级#A"], [977, 1.13, "中国移动的\"AI 新梦网\"，到底想赚什么"], [4182, 2.89, "token二道贩子躺赚，0 成本月入百万"], [2430, 1.28, "2026年Token赛道：下一个财富风口"], [966, 1.86, "从中国电信布局看token市场#AI#t"], [742, 2.7, "卖Token毛利率92%，普通人如何零成"], [1093, 1.65, "算力像自来水一样？中国移动正在干一件你没"], [582, 1.72, "你的下一份工资，可能用“Token”来发"]], "symbolSize": 8, "itemStyle": {"color": "#FE2C5599"}}, {"name": "视频号", "type": "scatter", "data": [[4694, 2.58, "电力超级周期：Token如何成为西部绿电"], [640, 6.56, "Token 代理这话题彻底火炸了，连孙宇"], [380, 3.95, "卖Token毛利率92%，普通人如何零成"], [2002, 4.9, "算力像自来水一样？中国移动正在干一件你没"], [775, 2.71, "2026年Token赛道：下一个财富风口"], [987, 7.5, "国家定调，全球疯抢的超级风口来了#算力#"], [3539, 3.84, "一块钱25万Token！算力时代的三种\""], [29, 13.79, "token二道贩子躺赚，0 成本月入百万"], [1197, 2.09, "把大模型塞进 SIM 卡？中国移动这次真"], [747, 2.01, "Token 已成核心生产资料#算力#AI"], [513, 6.04, "从中国电信布局看token市场#AI#t"], [43687, 5.74, "中国移动扔出万亿级 Token 体验包！"], [5407, 3.81, "普通人做Token代理生意，有两条路#A"], [2516, 3.06, "中国移动的\"AI 新梦网\"，到底想赚什么"], [664, 5.12, "你的下一份工资，可能用“Token”来发"], [2793, 2.33, "DeepSeek宣布永久降价，每百万to"], [1143, 2.45, "算力是什么？Token 为啥值钱？#算力"], [479, 1.67, "国产算力芯片翻身，算力从单极走向多级#A"], [444, 2.7, "Token赛道普通人零门槛怎么切入？#算"]], "symbolSize": 8, "itemStyle": {"color": "#07C16099"}}, {"name": "公众号", "type": "scatter", "data": [[6, 0.0, "【边缘计算前沿站】流量盒子的秘密：PCD"], [6, 0.0, "央视新闻发布：算力上天，太空从此有了AI"], [52, 0.0, "方舟学苑：全迅云AI基础孵化班报名通道上"], [52, 0.0, "方舟云图集：token是什么？"], [55, 0.0, "【全迅云｜方舟学苑】AI基础孵化班第2期"], [21, 0.0, "OpenAI重组三大产品线，全面押注编程"], [5, 0.0, "【边缘计算前沿站】lDC产业：数字经济的"], [119, 0.0, "【全迅云｜方舟学苑】AI基础孵化班第1期"], [11, 0.0, "GPT image 2 超全玩法"], [6, 0.0, "CDN的三种应用场景以及基本原理"], [10, 0.0, "\"同心协力 万物互联\"2025迅力云产品"], [11, 0.0, "【销冠60s】地推话术之扫街破冰技巧"]], "symbolSize": 8, "itemStyle": {"color": "#576B9599"}}], "platforms": ["抖音", "视频号", "公众号"]}, "top": [{"platform": "视频号", "platform_color": "#07C160", "title": "中国移动扔出万亿级 Token 体验包！#AI#token#算力#创业", "views": 43687, "likes": 585, "shares": 1896, "engagement": "5.74%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "一块钱25万Token！算力时代的三种\"油田\"模式#算力#AI#token#创业", "views": 12506, "likes": 113, "shares": 32, "engagement": "1.20%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "电力超级周期：Token如何成为西部绿电的出口载体？#AI#token#算力#创业", "views": 11842, "likes": 92, "shares": 5, "engagement": "0.85%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "普通人做Token代理生意，有两条路#AI#token#算力#创业", "views": 5407, "likes": 35, "shares": 152, "engagement": "3.81%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "电力超级周期：Token如何成为西部绿电的出口载体？#AI#token#算力#创业", "views": 4694, "likes": 56, "shares": 65, "engagement": "2.58%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "token二道贩子躺赚，0 成本月入百万？#AI#token#算力#创业", "views": 4182, "likes": 100, "shares": 21, "engagement": "2.89%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "一块钱25万Token！算力时代的三种\"油田\"模式#算力#AI#token#创业", "views": 3539, "likes": 39, "shares": 95, "engagement": "3.84%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "DeepSeek宣布永久降价，每百万token输入只要2.5分钱#AI#token#算力#创业", "views": 2793, "likes": 19, "shares": 44, "engagement": "2.33%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "中国移动的\"AI 新梦网\"，到底想赚什么钱？#移动云大会#算力#AI#token#创业", "views": 2516, "likes": 17, "shares": 60, "engagement": "3.06%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "2026年Token赛道：下一个财富风口#算力#AI#token#创业", "views": 2430, "likes": 28, "shares": 2, "engagement": "1.28%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "国产算力芯片翻身，算力从单极走向多级#AI#token#算力#创业", "views": 2076, "likes": 29, "shares": 0, "engagement": "1.49%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "算力像自来水一样？中国移动正在干一件你没注意到的大事#移动云大会#算力#AI#token#创业", "views": 2002, "likes": 24, "shares": 69, "engagement": "4.90%"}, {"platform": "抖音", "platform_color": "#FE2C55", "title": "算力是什么？Token 为啥值钱？#算力#AI#token#创业", "views": 1786, "likes": 19, "shares": 0, "engagement": "1.12%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "把大模型塞进 SIM 卡？中国移动这次真敢想#移动云大会#算力#AI#token#创业", "views": 1197, "likes": 11, "shares": 14, "engagement": "2.09%"}, {"platform": "视频号", "platform_color": "#07C160", "title": "算力是什么？Token 为啥值钱？#算力#AI#token#创业", "views": 1143, "likes": 8, "shares": 20, "engagement": "2.45%"}]};
 
